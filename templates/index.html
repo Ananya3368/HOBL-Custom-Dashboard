@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HOBL Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+    <style>
+        :root {
+            --primary: #0078d4;
+            --primary-dark: #005a9e;
+            --bg: #f5f5f5;
+            --card-bg: #ffffff;
+            --border: #e0e0e0;
+            --text: #323130;
+            --text-secondary: #605e5c;
+            --iter-header-bg: #e8f0fe;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        header {
+            background: var(--primary);
+            color: white;
+            padding: 16px 32px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+
+        header h1 { font-size: 20px; font-weight: 600; }
+
+        .container {
+            max-width: 1200px;
+            margin: 24px auto;
+            padding: 0 24px;
+        }
+
+        /* ── Filters ────────────────────────────────────── */
+        .filters {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 20px 24px;
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            margin-bottom: 24px;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            min-width: 200px;
+            flex: 1;
+        }
+
+        .filter-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .filter-group select {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+            color: var(--text);
+            cursor: pointer;
+        }
+
+        .filter-group input {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 14px;
+            background: white;
+            color: var(--text);
+        }
+
+        .filter-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(0,120,212,0.2);
+        }
+
+        .filter-group select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(0,120,212,0.2);
+        }
+
+        .filter-group select:disabled,
+        .filter-group input:disabled {
+            background: #f0f0f0;
+            color: #999;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        /* ── Filter actions / buttons ───────────────────── */
+        .filter-actions {
+            display: flex;
+            gap: 8px;
+            align-items: flex-end;
+        }
+
+        .btn {
+            padding: 9px 20px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-dark); }
+
+        .btn-secondary {
+            background: white;
+            color: var(--text-secondary);
+            border-color: var(--border);
+        }
+        .btn-secondary:hover { background: #f0f0f0; }
+
+        /* ── Status ─────────────────────────────────────── */
+        .status {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+            font-size: 15px;
+        }
+
+        .status.error { color: #d13438; }
+
+        .spinner {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 8px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Table ──────────────────────────────────────── */
+        .table-wrapper {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .results-summary {
+            padding: 12px 24px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead th {
+            position: sticky;
+            top: 0;
+            background: var(--primary);
+            color: white;
+            text-align: left;
+            padding: 12px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        tbody td {
+            padding: 10px 16px;
+            font-size: 14px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tbody tr:hover { background: #f0f6ff; }
+
+        /* Iteration separator row */
+        .iter-header td {
+            background: var(--iter-header-bg);
+            font-weight: 600;
+            color: var(--primary-dark);
+            padding: 8px 16px;
+            font-size: 13px;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        /* ── Transposed (Excel-style) table ─────────────────── */
+        .xtable-scroll { overflow-x: auto; max-width: 100%; }
+        table.xtable {
+            border-collapse: collapse;
+            font-size: 13px;
+            white-space: nowrap;
+        }
+        table.xtable td {
+            border: 1px solid var(--border);
+            padding: 5px 10px;
+            text-align: center;
+        }
+        table.xtable td.num { text-align: right; font-variant-numeric: tabular-nums; }
+        table.xtable td.na { color: var(--text-secondary); font-style: italic; }
+        table.xtable td.row-label {
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            background: #f5f7fa;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text);
+            min-width: 230px;
+            border-right: 2px solid var(--border);
+        }
+        table.xtable tr:hover td { background: #f0f6ff; }
+        table.xtable tr:hover td.row-label { background: #e9eff7; }
+        table.xtable tr.hdr-row td { background: #fafbfc; }
+        table.xtable tr.hdr-row td.row-label { background: #eef1f5; }
+        table.xtable tr.scenario-row td,
+        table.xtable tr.date-row td,
+        table.xtable tr.filepath-row td,
+        table.xtable tr.iter-row td {
+            background: #eef2f8;
+            font-weight: 600;
+            color: var(--primary-dark);
+        }
+        table.xtable tr.scenario-row td { background: #e3ebf6; }
+        table.xtable td.scenario-cell { text-align: center; background: #e3ebf6; }
+        table.xtable td.date-cell { text-align: center; background: #eef2f8; }
+        table.xtable tr.section-row td {
+            background: var(--primary);
+            color: #fff;
+            text-align: left;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            position: sticky;
+            left: 0;
+        }
+
+        .metric-type {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .metric-type.PowerMetrics { background: #e8f5e9; color: #2e7d32; }
+        .metric-type.PowerCalculation { background: #fff3e0; color: #e65100; }
+        .metric-type.PerfMetrics { background: #e3f2fd; color: #1565c0; }
+
+        .value-cell { font-family: 'Consolas', 'Courier New', monospace; font-weight: 600; }
+
+        /* ── Charts (Box & Whisker view) ────────────────── */
+        .chart-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px 20px 8px;
+            margin-bottom: 20px;
+        }
+
+        .chart-card h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 4px;
+        }
+
+        .chart-card .chart-sub {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .chart-empty {
+            padding: 24px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .chart-note {
+            background: #fffbe6;
+            border: 1px solid #ffe58f;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #614700;
+            margin-bottom: 20px;
+        }
+
+        .chart-card .chart-sub::after {
+            content: ' Click a metric to zoom in.';
+            color: var(--primary);
+        }
+
+        /* ── Zoom modal ─────────────────────────────────── */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 24px;
+        }
+        .modal-overlay[hidden] { display: none; }
+
+        .modal-box {
+            background: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+            width: min(1000px, 96vw);
+            max-height: 92vh;
+            overflow: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            line-height: 1;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 0 4px;
+        }
+        .modal-close:hover { color: var(--text); }
+
+        .modal-body { padding: 16px 20px 20px; }
+        #modalChart { width: 100%; }
+
+        .pct-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .pct-controls label { font-weight: 600; font-size: 13px; color: var(--text); }
+        .pct-controls select {
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 13px;
+            min-width: 260px;
+        }
+
+        #modalStats { margin-top: 8px; }
+        #modalStats table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        #modalStats th, #modalStats td {
+            border: 1px solid var(--border);
+            padding: 6px 10px;
+            text-align: right;
+            white-space: nowrap;
+        }
+        #modalStats th { background: #f5f7fa; color: var(--text); font-weight: 600; }
+        #modalStats td:first-child, #modalStats th:first-child { text-align: left; }
+        .stats-swatch {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+            margin-right: 6px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+    <h1>HOBL Dashboard</h1>
+</header>
+
+<div class="container">
+    <!-- Filters -->
+    <div class="filters">
+        <div class="filter-group">
+            <label>Device</label>
+            <select id="deviceSelect">
+                <option value="">All devices</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>RAM Config</label>
+            <select id="ramSelect">
+                <option value="">All RAM configs</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Scenario</label>
+            <select id="scenarioSelect">
+                <option value="">All scenarios</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label>Start Date</label>
+            <input type="date" id="startDate">
+        </div>
+        <div class="filter-group">
+            <label>End Date</label>
+            <input type="date" id="endDate">
+        </div>
+        <div class="filter-group">
+            <label>Last N Iterations</label>
+            <input type="number" id="lastN" min="1" step="1" placeholder="All">
+        </div>
+        <div class="filter-actions">
+            <button id="applyBtn" class="btn btn-primary">Apply</button>
+            <button id="resetBtn" class="btn btn-secondary">Reset</button>
+        </div>
+        <div class="filter-group">
+            <label>View</label>
+            <select id="viewSelect">
+                <option value="table">Table (Specified)</option>
+                <option value="table_all">Table (All Metrics)</option>
+                <option value="box">Box &amp; Whisker</option>
+                <option value="percentile">Percentile Distribution</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div id="results">
+        <div class="status">Choose any filters (or none) and click <strong>Apply</strong> to view metrics.</div>
+    </div>
+</div>
+
+<!-- Zoom modal for a single metric's box plot -->
+<div id="metricModal" class="modal-overlay" hidden>
+    <div class="modal-box">
+        <div class="modal-header">
+            <span id="modalTitle">Metric</span>
+            <button id="modalClose" class="modal-close" aria-label="Close">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="modalChart"></div>
+            <div id="modalStats"></div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+const deviceSelect = document.getElementById('deviceSelect');
+const ramSelect = document.getElementById('ramSelect');
+const scenarioSelect = document.getElementById('scenarioSelect');
+const startDate = document.getElementById('startDate');
+const endDate = document.getElementById('endDate');
+const lastN = document.getElementById('lastN');
+const applyBtn = document.getElementById('applyBtn');
+const resetBtn = document.getElementById('resetBtn');
+const viewSelect = document.getElementById('viewSelect');
+const resultsDiv = document.getElementById('results');
+const metricModal = document.getElementById('metricModal');
+const modalTitle = document.getElementById('modalTitle');
+const modalChart = document.getElementById('modalChart');
+const modalClose = document.getElementById('modalClose');
+
+// Last fetched metrics, so switching views doesn't require a refetch.
+let currentMetrics = null;
+let currentTable = null;   // per-iteration columns for the transposed table views
+let lastParams = '';
+
+// Remembers the metric chosen in the Percentile Distribution view so it
+// survives re-renders (e.g. switching metric without refetching).
+let pctMetricName = null;
+
+// Stable device→color map so a device keeps the same color in the main
+// box charts, the legend, and the zoomed-in modal.
+const DEVICE_COLORS = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b'];
+let deviceColorMap = {};
+
+function buildDeviceColorMap(metrics) {
+    const devices = Array.from(new Set(metrics.map(m => m.Device))).sort();
+    deviceColorMap = {};
+    devices.forEach((d, i) => { deviceColorMap[d] = DEVICE_COLORS[i % DEVICE_COLORS.length]; });
+}
+
+function colorFor(device) {
+    return deviceColorMap[device] || DEVICE_COLORS[0];
+}
+
+// ── Helpers ─────────────────────────────────────────────────────
+
+function showStatus(msg, isError = false) {
+    resultsDiv.innerHTML = `<div class="status ${isError ? 'error' : ''}">${msg}</div>`;
+}
+
+function showLoading(msg = 'Loading...') {
+    resultsDiv.innerHTML = `<div class="status"><div class="spinner"></div><br>${msg}</div>`;
+}
+
+async function fetchJson(url) {
+    const resp = await fetch(url);
+    if (!resp.ok) {
+        let detail = `Request failed: ${resp.status}`;
+        try { const j = await resp.json(); if (j && j.error) detail = j.error; } catch (e) {}
+        throw new Error(detail);
+    }
+    return resp.json();
+}
+
+function appendOptions(select, items) {
+    items.forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = item;
+        opt.textContent = item;
+        select.appendChild(opt);
+    });
+}
+
+function escapeHtml(value) {
+    return String(value).replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+}
+
+// ── Load filter options on page load ───────────────────────────
+
+async function loadFilters() {
+    try {
+        const opts = await fetchJson('/api/filters');
+        if (opts.error) {
+            showStatus('Error loading filters: ' + opts.error, true);
+            return;
+        }
+        appendOptions(deviceSelect, opts.devices || []);
+        // RAM option value = raw number; label shows "GB".
+        (opts.rams || []).forEach(r => {
+            const opt = document.createElement('option');
+            opt.value = r;
+            opt.textContent = `${r} GB`;
+            ramSelect.appendChild(opt);
+        });
+        appendOptions(scenarioSelect, opts.scenarios || []);
+        // Constrain the date pickers to the available range and default to it.
+        const dates = (opts.dates || []).slice().sort();  // ascending
+        if (dates.length) {
+            const min = dates[0];
+            const max = dates[dates.length - 1];
+            startDate.min = min; startDate.max = max; startDate.value = min;
+            endDate.min = min; endDate.max = max; endDate.value = max;
+        }
+    } catch (e) {
+        showStatus('Failed to load filters: ' + e.message, true);
+    }
+}
+
+// ── Apply / Reset ──────────────────────────────────────────────
+
+async function applyFilters() {
+    const useLastN = lastN.value && Number(lastN.value) > 0;
+    if (!useLastN && startDate.value && endDate.value && startDate.value > endDate.value) {
+        showStatus('Start date must be on or before end date.', true);
+        return;
+    }
+    const params = new URLSearchParams();
+    if (deviceSelect.value) params.set('device', deviceSelect.value);
+    if (ramSelect.value) params.set('ram', ramSelect.value);
+    if (scenarioSelect.value) params.set('scenario', scenarioSelect.value);
+    // Date range and Last-N are mutually exclusive: Last-N takes precedence.
+    if (useLastN) {
+        params.set('last_n', lastN.value);
+    } else {
+        if (startDate.value) params.set('start_date', startDate.value);
+        if (endDate.value) params.set('end_date', endDate.value);
+    }
+
+    showLoading('Fetching metrics...');
+    lastParams = params.toString();
+    try {
+        const [metrics, table] = await Promise.all([
+            fetchJson('/api/metrics?' + lastParams),
+            fetchJson('/api/table?' + lastParams),
+        ]);
+        if (metrics.error) { showStatus('Error loading metrics: ' + metrics.error, true); return; }
+        currentMetrics = (metrics && metrics.length) ? metrics : null;
+        currentTable = (table && table.length) ? table : null;
+        if (!currentMetrics && !currentTable) {
+            showStatus('No data found for the selected filters.');
+            return;
+        }
+        renderCurrentView();
+    } catch (e) {
+        showStatus('Failed to load data: ' + e.message, true);
+    }
+}
+
+// Re-render the already-fetched data in whichever view is selected.
+function renderCurrentView() {
+    const v = viewSelect.value;
+    if (v === 'box') {
+        if (currentMetrics) renderBoxplots(currentMetrics);
+    } else if (v === 'percentile') {
+        if (currentMetrics) renderPercentile(currentMetrics);
+    } else if (v === 'table_all') {
+        if (currentTable) renderTableTransposed(currentTable, false);
+        else showStatus('No data found for the selected filters.');
+    } else {
+        if (currentTable) renderTableTransposed(currentTable, true);
+        else showStatus('No data found for the selected filters.');
+    }
+}
+
+function resetFilters() {
+    deviceSelect.value = '';
+    ramSelect.value = '';
+    scenarioSelect.value = '';
+    startDate.value = startDate.min || '';
+    endDate.value = endDate.max || '';
+    lastN.value = '';
+    syncExclusiveFilters();
+    pctMetricName = null;
+    currentMetrics = null;
+    showStatus('Choose any filters (or none) and click <strong>Apply</strong> to view metrics.');
+}
+
+// ── Render metrics table (grouped by config + iteration) ───────
+
+function activeFilterSummary() {
+    const parts = [];
+    parts.push(`Device: <strong>${deviceSelect.value ? escapeHtml(deviceSelect.value) : 'All'}</strong>`);
+    parts.push(`RAM: <strong>${ramSelect.value ? escapeHtml(ramSelect.value) + ' GB' : 'All'}</strong>`);
+    parts.push(`Scenario: <strong>${scenarioSelect.value ? escapeHtml(scenarioSelect.value) : 'All'}</strong>`);
+    const useLastN = lastN.value && Number(lastN.value) > 0;
+    if (useLastN) {
+        parts.push(`Dates: <strong>All</strong>`);
+        parts.push(`Last <strong>${escapeHtml(lastN.value)}</strong> iter.`);
+    } else {
+        const range = (startDate.value || endDate.value)
+            ? `${escapeHtml(startDate.value || '…')} → ${escapeHtml(endDate.value || '…')}`
+            : 'All';
+        parts.push(`Dates: <strong>${range}</strong>`);
+    }
+    return parts.join(' &nbsp;|&nbsp; ');
+}
+
+// ── Render transposed Table view (Excel-style: iterations as columns) ──────────
+//
+// Rows = metrics/attributes, columns = iterations (grouped by date). Two modes:
+//   curated=true  -> only the user-specified metrics, with first / P50-P70-P90.
+//   curated=false -> every metric (all power + all perf samples).
+
+// Curated perf metrics, in display order. `pts` = acceptable Perftrack Ids
+// (match any). `kind`: 'first' shows the first matching sample; 'pct' shows
+// P50/P70/P90 computed across that iteration's samples. `name` matches a
+// no-pt perf entry (e.g. teams_fps). N/A when nothing matches in a column.
+const CURATED_PERF = [
+    { label: 'Office-Outlook-Boot v2', kind: 'first', pts: [8804] },
+    { label: 'Office-Word-Boot v2', kind: 'first', pts: [8805] },
+    { label: 'Office-XL-Boot v2', kind: 'first', pts: [8806] },
+    { label: 'Office-PPT-Boot v2', kind: 'first', pts: [8807] },
+    { label: 'Edge Launch (First Launch)', kind: 'first', pts: [8998] },
+    { label: 'Edge Page Load', kind: 'first', pts: [9412] },
+    { label: 'Start Launch', kind: 'pct', pts: [1809, 9917] },
+    { label: 'File Explorer Launch', kind: 'first', pts: [9475, 10052] },
+    { label: 'Snipping Tool Overlay Launch Performance', kind: 'first', pts: [9971] },
+    { label: 'Type-to-Search', kind: 'pct', pts: [2430, 9459] },
+    { label: 'Search Full Activation', kind: 'pct', pts: [9232] },
+    { label: 'Explorer Input Delay', kind: 'first', pts: [6352] },
+    { label: 'Teams FPS', kind: 'first', pts: [], name: 'teams_fps' },
+];
+
+const HEADER_LABELS = ['IHV', 'OEM', 'Device', 'Device name', 'LKG', 'OS Build', 'HW Version (EV/DV)', 'Battery Capacity', 'Usable RAM'];
+const POWER_LABELS = ['SoC Power (W)', 'Memory Power (W)', 'Display Power (W)', 'System Power (W)', 'Battery Life (hrs)'];
+
+function fmtNum(v) {
+    if (v === null || v === undefined || v === '' || Number.isNaN(v)) return '';
+    if (typeof v !== 'number') return escapeHtml(String(v));
+    return Number.isInteger(v) ? String(v) : (Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(3));
+}
+
+// Collect a curated perf metric's matching samples within one column.
+function curatedSamples(col, cfg) {
+    if (cfg.pts && cfg.pts.length) {
+        for (const pt of cfg.pts) {
+            const arr = col.PerfByPt[pt];
+            if (arr && arr.length) return arr;
+        }
+    }
+    if (cfg.name && col.PerfByName[cfg.name] !== undefined) return [col.PerfByName[cfg.name]];
+    return null;
+}
+
+function renderTableTransposed(cols, curated) {
+    if (!cols || !cols.length) { showStatus('No data found for the selected filters.'); return; }
+
+    // Group columns by scenario (contiguous, since backend sorts by scenario),
+    // and by date *within* a scenario (so a date never merges across scenarios).
+    const scenarioGroups = [];
+    const dateGroups = [];
+    cols.forEach(c => {
+        let sg = scenarioGroups[scenarioGroups.length - 1];
+        if (!sg || sg.scenario !== c.Scenario) { sg = { scenario: c.Scenario, cols: [] }; scenarioGroups.push(sg); }
+        sg.cols.push(c);
+
+        let dg = dateGroups[dateGroups.length - 1];
+        if (!dg || dg.date !== c.Date || dg.scenario !== c.Scenario) {
+            dg = { date: c.Date, scenario: c.Scenario, cols: [] }; dateGroups.push(dg);
+        }
+        dg.cols.push(c);
+    });
+    const nCols = cols.length;
+
+    const td = (s, cls) => `<td${cls ? ` class="${cls}"` : ''}>${s}</td>`;
+    const labelCell = s => `<td class="row-label">${escapeHtml(s)}</td>`;
+
+    let body = '';
+
+    // DUT header rows (one value per column).
+    HEADER_LABELS.forEach(lbl => {
+        body += `<tr class="hdr-row">` + labelCell(lbl) +
+            cols.map(c => td(escapeHtml(String(c.Header[lbl] ?? '')))).join('') + `</tr>`;
+    });
+
+    // Scenario row (merged per scenario group).
+    body += `<tr class="scenario-row">` + `<td class="row-label">Scenario</td>` +
+        scenarioGroups.map(g => `<td class="scenario-cell" colspan="${g.cols.length}">${escapeHtml(g.scenario)}</td>`).join('') + `</tr>`;
+
+    // Date row (merged per date group, broken on scenario change).
+    body += `<tr class="date-row">` + `<td class="row-label">Date</td>` +
+        dateGroups.map(g => `<td class="date-cell" colspan="${g.cols.length}">${escapeHtml(g.date)}</td>`).join('') + `</tr>`;
+
+    // File Path row = run_number.
+    body += `<tr class="filepath-row">` + `<td class="row-label">File Path</td>` +
+        cols.map(c => td(escapeHtml(String(c.Iteration ?? '')))).join('') + `</tr>`;
+
+    // Iteration row = 1..N per scenario group.
+    body += `<tr class="iter-row">` + `<td class="row-label">Iteration</td>` +
+        scenarioGroups.map(g => g.cols.map((c, i) => td(String(i + 1))).join('')).join('') + `</tr>`;
+
+    // Power Metrics section.
+    body += `<tr class="section-row"><td class="row-label" colspan="${nCols + 1}">Power Metrics</td></tr>`;
+    POWER_LABELS.forEach(lbl => {
+        body += `<tr>` + labelCell(lbl) +
+            cols.map(c => td(fmtNum(c.Power[lbl]), 'num')).join('') + `</tr>`;
+    });
+
+    // Performance Metrics section.
+    body += `<tr class="section-row"><td class="row-label" colspan="${nCols + 1}">Performance Metrics</td></tr>`;
+    body += curated ? curatedPerfRows(cols) : allPerfRows(cols);
+
+    const html = `
+    <div class="table-wrapper">
+        <div class="results-summary">${activeFilterSummary()} &nbsp;|&nbsp; ${nCols} iteration(s)</div>
+        <div class="xtable-scroll">
+            <table class="xtable">
+                <tbody>${body}</tbody>
+            </table>
+        </div>
+    </div>`;
+    resultsDiv.innerHTML = html;
+}
+
+// Curated perf rows: first-value or P50/P70/P90 (collapsed if all equal).
+function curatedPerfRows(cols) {
+    const td = (s, cls) => `<td${cls ? ` class="${cls}"` : ''}>${s}</td>`;
+    const labelCell = s => `<td class="row-label">${escapeHtml(s)}</td>`;
+    let out = '';
+
+    CURATED_PERF.forEach(cfg => {
+        if (cfg.kind === 'first') {
+            out += `<tr>` + labelCell(cfg.label) + cols.map(c => {
+                const s = curatedSamples(c, cfg);
+                return td(s ? fmtNum(s[0]) : 'N/A', s ? 'num' : 'na');
+            }).join('') + `</tr>`;
+        } else {
+            // Per-column P50/P70/P90.
+            const p50 = [], p70 = [], p90 = [];
+            cols.forEach(c => {
+                const s = curatedSamples(c, cfg);
+                if (s) {
+                    const sorted = s.slice().sort((a, b) => a - b);
+                    p50.push(valueAtPercentile(sorted, 50));
+                    p70.push(valueAtPercentile(sorted, 70));
+                    p90.push(valueAtPercentile(sorted, 90));
+                } else { p50.push(null); p70.push(null); p90.push(null); }
+            });
+            const equal = p50.every((v, i) => v === p70[i] && v === p90[i]);
+            const rowFor = (label, arr) =>
+                `<tr>` + labelCell(label) +
+                arr.map(v => td(v === null ? 'N/A' : fmtNum(v), v === null ? 'na' : 'num')).join('') + `</tr>`;
+            if (equal) {
+                out += rowFor(cfg.label, p50);
+            } else {
+                out += rowFor(cfg.label + ' P50', p50);
+                out += rowFor(cfg.label + ' P70', p70);
+                out += rowFor(cfg.label + ' P90', p90);
+            }
+        }
+    });
+    return out;
+}
+
+// All-metrics perf rows: every metric, all sample values listed per column.
+function allPerfRows(cols) {
+    const td = (s, cls) => `<td${cls ? ` class="${cls}"` : ''}>${s}</td>`;
+    const labelCell = s => `<td class="row-label">${escapeHtml(s)}</td>`;
+
+    // Union of all perf identities across columns. Key by pt when present,
+    // else by name. Keep a friendly display name.
+    const order = [];
+    const seen = new Map();
+    cols.forEach(c => {
+        c.PerfAll.forEach(p => {
+            const key = (p.pt !== null && p.pt !== undefined) ? 'pt:' + p.pt : 'nm:' + p.name;
+            if (!seen.has(key)) {
+                seen.set(key, { key, pt: p.pt, name: p.name });
+                order.push(key);
+            }
+        });
+    });
+
+    let out = '';
+    order.forEach(key => {
+        const meta = seen.get(key);
+        const label = meta.name + (meta.pt != null ? ` (pt ${meta.pt})` : '');
+        out += `<tr>` + labelCell(label) + cols.map(c => {
+            let vals;
+            if (meta.pt != null) vals = c.PerfByPt[meta.pt];
+            else vals = (c.PerfByName[meta.name] !== undefined) ? [c.PerfByName[meta.name]] : null;
+            if (!vals || !vals.length) return td('N/A', 'na');
+            return td(vals.map(fmtNum).join(', '), 'num');
+        }).join('') + `</tr>`;
+    });
+
+    // Also list all power_metrics (pm_emi_*) in the all view.
+    const pmNames = [];
+    const pmSeen = new Set();
+    cols.forEach(c => Object.keys(c.PowerMetrics).forEach(n => { if (!pmSeen.has(n)) { pmSeen.add(n); pmNames.push(n); } }));
+    if (pmNames.length) {
+        out += `<tr class="section-row"><td class="row-label" colspan="${cols.length + 1}">Power Metrics (raw rails)</td></tr>`;
+        pmNames.forEach(n => {
+            out += `<tr>` + labelCell(n) + cols.map(c => {
+                const e = c.PowerMetrics[n];
+                return td(e ? fmtNum(e.value) : 'N/A', e ? 'num' : 'na');
+            }).join('') + `</tr>`;
+        });
+    }
+    return out;
+}
+
+// ── Render Percentile Distribution view ────────────────────────
+//
+// X axis = percentile (0–100), Y axis = the metric's value. For a single
+// device/RAM/scenario, the chosen metric's values across the selected
+// iterations ("Last N Iterations") are sorted ascending and spread across the
+// percentile axis: rank i of n maps to percentile i/(n-1)*100. P50/P70/P90 are
+// computed by linear interpolation and annotated.
+
+function valueAtPercentile(sorted, p) {
+    const n = sorted.length;
+    if (n === 0) return null;
+    if (n === 1) return sorted[0];
+    const pos = (p / 100) * (n - 1);
+    const lo = Math.floor(pos), hi = Math.ceil(pos);
+    if (lo === hi) return sorted[lo];
+    return sorted[lo] + (pos - lo) * (sorted[hi] - sorted[lo]);
+}
+
+function renderPercentile(metrics) {
+    // The percentile view describes ONE config. Bail out clearly if the current
+    // filters span multiple devices / RAM configs / scenarios.
+    const groups = Array.from(new Set(metrics.map(m => [m.Device, m.Ram, m.Scenario].join('\u0001'))));
+    if (groups.length > 1) {
+        resultsDiv.innerHTML =
+            `<div class="results-summary">${activeFilterSummary()} &nbsp;|&nbsp; ${metrics.length} metric(s)</div>` +
+            `<div class="chart-note">The Percentile Distribution view shows one configuration at a time. ` +
+            `Please narrow the filters to a single <strong>Device</strong>, <strong>RAM</strong>, and <strong>Scenario</strong> ` +
+            `(currently ${groups.length} combinations match).</div>`;
+        return;
+    }
+
+    // Distinct metrics for this config, ordered by metric type then name.
+    const typeRank = { PowerMetrics: 0, PowerCalculation: 1, PerfMetrics: 2 };
+    const byName = {};
+    metrics.forEach(m => { (byName[m.MetricName] = byName[m.MetricName] || []).push(m); });
+    const names = Object.keys(byName).sort((a, b) => {
+        const ra = typeRank[byName[a][0].MetricType] ?? 9, rb = typeRank[byName[b][0].MetricType] ?? 9;
+        return ra - rb || a.localeCompare(b);
+    });
+
+    if (pctMetricName === null || !byName[pctMetricName]) pctMetricName = names[0];
+
+    const options = names.map(n =>
+        `<option value="${escapeHtml(n)}"${n === pctMetricName ? ' selected' : ''}>${escapeHtml(n)}</option>`
+    ).join('');
+
+    resultsDiv.innerHTML = `
+        <div class="results-summary">${activeFilterSummary()} &nbsp;|&nbsp; ${metrics.length} metric(s)</div>
+        <div class="chart-card">
+            <div class="pct-controls">
+                <label for="pctMetric">Metric:</label>
+                <select id="pctMetric">${options}</select>
+            </div>
+            <div class="chart-sub">Values across the selected iterations, sorted and spread over the 0–100 percentile axis. Set <strong>Last N Iterations</strong> to choose how many recent iterations to include.</div>
+            <div id="pctChart"></div>
+        </div>`;
+
+    const sel = document.getElementById('pctMetric');
+    sel.addEventListener('change', () => { pctMetricName = sel.value; drawPercentileChart(byName[pctMetricName]); });
+    drawPercentileChart(byName[pctMetricName]);
+}
+
+function drawPercentileChart(rows) {
+    const el = document.getElementById('pctChart');
+    const m0 = rows[0];
+    const device = m0.Device;
+    const unit = m0.Unit && m0.Unit !== 'N/A' ? m0.Unit : '';
+    const color = colorFor(device);
+
+    // Each iteration contributes one value; sort ascending.
+    const values = rows.map(r => Number(r.Value)).filter(Number.isFinite).sort((a, b) => a - b);
+    if (!values.length) {
+        el.innerHTML = '<div class="chart-empty">No numeric values for this metric.</div>';
+        return;
+    }
+
+    const n = values.length;
+    const xs = values.map((_, i) => (n === 1 ? 50 : (i / (n - 1)) * 100));
+
+    const lineTrace = {
+        type: 'scatter',
+        mode: 'lines+markers',
+        name: device,
+        x: xs,
+        y: values,
+        line: { color: color, width: 2 },
+        marker: { color: color, size: 6 },
+        hovertemplate: 'Percentile %{x:.0f}<br>Value %{y}' + (unit ? ' ' + unit : '') + '<extra></extra>',
+    };
+
+    // P50 / P70 / P90 reference markers + annotations.
+    const refs = [50, 70, 90];
+    const refColors = { 50: '#8B0000', 70: '#E67E00', 90: '#1a237e' };
+    const shapes = [], annotations = [];
+    const refTrace = { type: 'scatter', mode: 'markers', x: [], y: [], showlegend: false,
+        marker: { color: [], size: 11, symbol: 'diamond', line: { color: '#333', width: 1 } },
+        hovertemplate: 'P%{x:.0f}<br>%{y:.1f}' + (unit ? ' ' + unit : '') + '<extra></extra>' };
+    refs.forEach(p => {
+        const v = valueAtPercentile(values, p);
+        shapes.push({ type: 'line', x0: p, x1: p, yref: 'paper', y0: 0, y1: 1,
+            line: { color: refColors[p], width: 1, dash: 'dash' } });
+        refTrace.x.push(p); refTrace.y.push(v); refTrace.marker.color.push(refColors[p]);
+        annotations.push({ x: p, y: v, text: `P${p}: ${v.toFixed(1)}${unit ? ' ' + unit : ''}`,
+            showarrow: true, arrowhead: 0, ax: 0, ay: -28,
+            bgcolor: refColors[p], font: { color: 'white', size: 11 }, bordercolor: refColors[p] });
+    });
+
+    const layout = {
+        height: 460,
+        margin: { l: 70, r: 30, t: 20, b: 50 },
+        xaxis: { title: 'Percentile', range: [-2, 102], dtick: 10, gridcolor: '#eee', zeroline: false },
+        yaxis: { title: unit ? `Value (${unit})` : 'Value', gridcolor: '#eee', zeroline: false },
+        shapes: shapes,
+        annotations: annotations,
+        showlegend: true,
+        legend: { orientation: 'h', y: 1.08, x: 0 },
+        font: { family: 'Segoe UI, Tahoma, sans-serif', size: 12 },
+        paper_bgcolor: 'white',
+        plot_bgcolor: 'white',
+    };
+
+    Plotly.newPlot('pctChart', [lineTrace, refTrace], layout, { responsive: true, displayModeBar: false });
+}
+
+// ── Render Box & Whisker view ──────────────────────────────────
+
+const BOX_TYPES = [
+    { type: 'PowerMetrics', title: 'Power Metrics', id: 'boxPower' },
+    { type: 'PowerCalculation', title: 'Power Calculation', id: 'boxCalc' },
+];
+
+function median(values) {
+    const s = values.slice().sort((a, b) => a - b);
+    const mid = Math.floor(s.length / 2);
+    return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+
+function renderBoxplots(metrics) {
+    buildDeviceColorMap(metrics);
+    let html = `<div class="results-summary">${activeFilterSummary()} &nbsp;|&nbsp; ${metrics.length} metric(s)</div>`;
+    BOX_TYPES.forEach(cfg => {
+        html += `
+        <div class="chart-card">
+            <h3>${cfg.title}</h3>
+            <div class="chart-sub">Distribution of each metric across the selected iterations${'\u0020'}(box = quartiles, line = median).</div>
+            <div id="${cfg.id}"></div>
+        </div>`;
+    });
+    html += `<div class="chart-note">Perf Metrics box plots are not shown yet (a metric can repeat with different values within one iteration). This is pending confirmation.</div>`;
+    resultsDiv.innerHTML = html;
+
+    BOX_TYPES.forEach(cfg => {
+        const rows = metrics.filter(m => m.MetricType === cfg.type);
+        drawBoxChart(cfg.id, rows);
+    });
+}
+
+function drawBoxChart(elementId, rows) {
+    const el = document.getElementById(elementId);
+    if (!rows.length) {
+        el.innerHTML = '<div class="chart-empty">No data for the selected filters.</div>';
+        return;
+    }
+
+    // Label each metric row with its unit (units can differ within a type).
+    const labelOf = r => r.Unit ? `${r.MetricName} (${r.Unit})` : r.MetricName;
+
+    // Order metrics by overall median value ascending so the largest sit on top.
+    const valuesByLabel = {};
+    rows.forEach(r => {
+        const v = Number(r.Value);
+        if (!Number.isFinite(v)) return;
+        (valuesByLabel[labelOf(r)] = valuesByLabel[labelOf(r)] || []).push(v);
+    });
+    const orderedLabels = Object.keys(valuesByLabel)
+        .sort((a, b) => median(valuesByLabel[a]) - median(valuesByLabel[b]));
+
+    // One box trace per device (color-coded) so multiple devices stay separate.
+    const devices = Array.from(new Set(rows.map(r => r.Device)));
+    const traces = devices.map(device => {
+        const dr = rows.filter(r => r.Device === device);
+        const color = colorFor(device);
+        return {
+            type: 'box',
+            name: device,
+            orientation: 'h',
+            y: dr.map(labelOf),
+            x: dr.map(r => Number(r.Value)),
+            boxpoints: 'all',
+            jitter: 0.4,
+            pointpos: 0,
+            marker: { size: 4, color: color },
+            line: { color: color },
+            fillcolor: color + '33',
+            hovertemplate: '%{y}<br>%{x}<extra>' + device + '</extra>',
+        };
+    });
+
+    const rowHeight = Math.max(18, 26 - devices.length * 2);
+    const height = Math.max(280, orderedLabels.length * devices.length * rowHeight + 120);
+
+    const layout = {
+        height: height,
+        margin: { l: 240, r: 24, t: 10, b: 40 },
+        boxmode: 'group',
+        xaxis: { title: 'Value', zeroline: false, gridcolor: '#eee' },
+        yaxis: { categoryorder: 'array', categoryarray: orderedLabels, automargin: true },
+        legend: { orientation: 'h', y: 1.02, x: 0 },
+        showlegend: devices.length > 1,
+        font: { family: 'Segoe UI, Tahoma, sans-serif', size: 12 },
+        paper_bgcolor: 'white',
+        plot_bgcolor: 'white',
+    };
+
+    Plotly.newPlot(elementId, traces, layout, { responsive: true, displayModeBar: false });
+
+    // Click a metric (box or point) to open a zoomed-in, auto-scaled view.
+    el.on('plotly_click', evt => {
+        if (!evt.points || !evt.points.length) return;
+        const label = evt.points[0].y;
+        openMetricModal(label, rows);
+    });
+}
+
+// ── Single-metric zoom modal ───────────────────────────────────
+
+function quantile(sorted, q) {
+    const pos = (sorted.length - 1) * q;
+    const base = Math.floor(pos);
+    const rest = pos - base;
+    return sorted[base + 1] !== undefined
+        ? sorted[base] + rest * (sorted[base + 1] - sorted[base])
+        : sorted[base];
+}
+
+function computeStats(values) {
+    const s = values.slice().sort((a, b) => a - b);
+    const n = s.length;
+    const min = s[0], max = s[n - 1];
+    const q1 = quantile(s, 0.25), med = quantile(s, 0.5), q3 = quantile(s, 0.75);
+    const iqr = q3 - q1;
+    const loBound = q1 - 1.5 * iqr, hiBound = q3 + 1.5 * iqr;
+    const lowerWhisker = s.find(v => v >= loBound);
+    let upperWhisker = max;
+    for (const v of s) { if (v <= hiBound) upperWhisker = v; }
+    const mean = s.reduce((a, b) => a + b, 0) / n;
+    const variance = n > 1 ? s.reduce((a, b) => a + (b - mean) ** 2, 0) / (n - 1) : 0;
+    const std = Math.sqrt(variance);
+    return { n, min, lowerWhisker, q1, med, q3, upperWhisker, max, mean, std };
+}
+
+function fmt(v) {
+    if (v === undefined || v === null || Number.isNaN(v)) return '—';
+    return Number.isInteger(v) ? String(v) : v.toFixed(4);
+}
+
+function openMetricModal(label, typeRows) {
+    const rows = typeRows.filter(r => (r.Unit ? `${r.MetricName} (${r.Unit})` : r.MetricName) === label);
+    if (!rows.length) return;
+
+    modalTitle.textContent = label;
+
+    const devices = Array.from(new Set(rows.map(r => r.Device)));
+
+    // One tall, horizontal box per device. Hover is disabled — all detail
+    // is shown in the stats table below the chart instead of on the graph.
+    const traces = devices.map((device, i) => {
+        const dr = rows.filter(r => r.Device === device);
+        const color = colorFor(device);
+        return {
+            type: 'box',
+            name: device,
+            orientation: 'h',
+            x: dr.map(r => Number(r.Value)),
+            y: dr.map(() => device),
+            boxmean: 'sd',
+            boxpoints: 'all',
+            jitter: 0.5,
+            pointpos: 0,
+            marker: { size: 6, color: color },
+            line: { color: color },
+            fillcolor: color + '33',
+            hoverinfo: 'skip',
+        };
+    });
+
+    const layout = {
+        height: 130 + devices.length * 130,
+        margin: { l: 160, r: 30, t: 16, b: 50 },
+        boxgap: 0.4,
+        xaxis: { title: 'Value' + (rows[0].Unit ? ` (${rows[0].Unit})` : ''), zeroline: false, gridcolor: '#eee', automargin: true },
+        yaxis: { automargin: true, tickfont: { size: 12 } },
+        showlegend: false,
+        font: { family: 'Segoe UI, Tahoma, sans-serif', size: 12 },
+        paper_bgcolor: 'white',
+        plot_bgcolor: 'white',
+    };
+
+    Plotly.newPlot('modalChart', traces, layout, { responsive: true, displayModeBar: false });
+
+    // Build the stats table (one row per device).
+    const unit = rows[0].Unit ? ` (${rows[0].Unit})` : '';
+    let html = `<table><thead><tr>
+        <th>Device</th><th>N</th><th>Min</th><th>Lower&nbsp;whisker</th>
+        <th>Q1</th><th>Median</th><th>Q3</th><th>Upper&nbsp;whisker</th>
+        <th>Max</th><th>Mean</th><th>Std&nbsp;dev</th></tr></thead><tbody>`;
+    devices.forEach((device, i) => {
+        const vals = rows.filter(r => r.Device === device).map(r => Number(r.Value)).filter(Number.isFinite);
+        if (!vals.length) return;
+        const st = computeStats(vals);
+        const color = colorFor(device);
+        html += `<tr>
+            <td><span class="stats-swatch" style="background:${color}"></span>${escapeHtml(device)}</td>
+            <td>${st.n}</td><td>${fmt(st.min)}</td><td>${fmt(st.lowerWhisker)}</td>
+            <td>${fmt(st.q1)}</td><td>${fmt(st.med)}</td><td>${fmt(st.q3)}</td>
+            <td>${fmt(st.upperWhisker)}</td><td>${fmt(st.max)}</td>
+            <td>${fmt(st.mean)}</td><td>${fmt(st.std)}</td></tr>`;
+    });
+    html += `</tbody></table><div class="chart-sub" style="margin-top:8px">All values in${unit || ' raw units'}.</div>`;
+    document.getElementById('modalStats').innerHTML = html;
+
+    metricModal.hidden = false;
+}
+
+function closeMetricModal() {
+    metricModal.hidden = true;
+    Plotly.purge('modalChart');
+}
+
+// ── Init ───────────────────────────────────────────────────────
+// Date range and Last-N are mutually exclusive. Entering a Last-N value
+// disables (greys out) the date pickers; clearing it re-enables them.
+function syncExclusiveFilters() {
+    const useLastN = lastN.value && Number(lastN.value) > 0;
+    startDate.disabled = useLastN;
+    endDate.disabled = useLastN;
+    startDate.classList.toggle('disabled', useLastN);
+    endDate.classList.toggle('disabled', useLastN);
+}
+
+applyBtn.addEventListener('click', applyFilters);
+resetBtn.addEventListener('click', resetFilters);
+viewSelect.addEventListener('change', renderCurrentView);
+lastN.addEventListener('input', syncExclusiveFilters);
+modalClose.addEventListener('click', closeMetricModal);
+metricModal.addEventListener('click', evt => { if (evt.target === metricModal) closeMetricModal(); });
+document.addEventListener('keydown', evt => { if (evt.key === 'Escape' && !metricModal.hidden) closeMetricModal(); });
+loadFilters();
+</script>
+
+</body>
+</html>
