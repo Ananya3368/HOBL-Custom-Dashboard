@@ -29,6 +29,20 @@ import config
 _TODAY = date.today().isoformat()
 
 
+def _as_set(value):
+    """Normalize a filter value (None / "" / str / iterable) to a set or None.
+
+    Returns None when no filtering should be applied (empty/falsy), so callers
+    can use ``not sel or r["X"] in sel``.
+    """
+    if value is None or value == "":
+        return None
+    if isinstance(value, str):
+        return {value}
+    s = {str(v) for v in value if str(v) != ""}
+    return s or None
+
+
 def _normalize_name(name: str) -> str:
     """Collapse whitespace runs to a single underscore, matching the metric
     name normalization done by HoblMetricExtractor before ingestion."""
@@ -256,12 +270,15 @@ def get_metrics(
     (device, ram, scenario, date, iteration, pt) so results stay distinguishable
     when several configs match.
     """
+    dev_set = _as_set(device)
+    ram_set = _as_set(ram)
+    scn_set = _as_set(scenario)
     rows = [
         r
         for r in _load_records()
-        if (not device or r["Device"] == device)
-        and (not ram or r["Ram"] == ram)
-        and (not scenario or r["Scenario"] == scenario)
+        if (not dev_set or r["Device"] in dev_set)
+        and (not ram_set or r["Ram"] in ram_set)
+        and (not scn_set or r["Scenario"] in scn_set)
         and (not start_date or r["RunDate"] >= start_date)
         and (not end_date or r["RunDate"] <= end_date)
     ]
@@ -435,12 +452,15 @@ def get_table_data(
     ascending (left-to-right, oldest first) so the table reads like the source
     spreadsheet.
     """
+    dev_set = _as_set(device)
+    ram_set = _as_set(ram)
+    scn_set = _as_set(scenario)
     cols = [
         c
         for c in _load_columns()
-        if (not device or c["Device"] == device)
-        and (not ram or c["Ram"] == ram)
-        and (not scenario or c["Scenario"] == scenario)
+        if (not dev_set or c["Device"] in dev_set)
+        and (not ram_set or c["Ram"] in ram_set)
+        and (not scn_set or c["Scenario"] in scn_set)
         and (not start_date or c["Date"] >= start_date)
         and (not end_date or c["Date"] <= end_date)
     ]

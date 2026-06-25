@@ -69,6 +69,26 @@ def _sanitize(value: str) -> str:
     return re.sub(r"['\\\x00-\x1f]", "", value)
 
 
+def _in_clause(column: str, value) -> str | None:
+    """Build a KQL filter for a single value or a list of values.
+
+    Returns ``None`` when no filtering should be applied (empty/falsy), an
+    ``==`` clause for one value, or an ``in (...)`` clause for several.
+    """
+    if value is None or value == "":
+        return None
+    if isinstance(value, str):
+        values = [value]
+    else:
+        values = [str(v) for v in value if str(v) != ""]
+    if not values:
+        return None
+    if len(values) == 1:
+        return f"    | where {column} == '{_sanitize(values[0])}'"
+    joined = ", ".join(f"'{_sanitize(v)}'" for v in values)
+    return f"    | where {column} in ({joined})"
+
+
 def _distinct(column: str) -> list[str]:
     kql = f"{_BASE}    | where isnotempty({column})\n    | distinct {column}"
     return [r[column] for r in _run_query(kql)]
@@ -164,12 +184,10 @@ def get_metrics(
     ``last_n`` then keeps only the most recent N of the remaining iterations.
     """
     clauses = []
-    if device:
-        clauses.append(f"    | where Device == '{_sanitize(device)}'")
-    if ram:
-        clauses.append(f"    | where Ram == '{_sanitize(ram)}'")
-    if scenario:
-        clauses.append(f"    | where Scenario == '{_sanitize(scenario)}'")
+    for col, val in (("Device", device), ("Ram", ram), ("Scenario", scenario)):
+        clause = _in_clause(col, val)
+        if clause:
+            clauses.append(clause)
     if start_date:
         clauses.append(f"    | where Date >= '{_sanitize(start_date)}'")
     if end_date:

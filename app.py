@@ -45,10 +45,17 @@ def _parse_filters():
         except ValueError:
             return None
 
+    def _list(name):
+        """Collect a multi-valued filter: repeated params and/or comma-separated."""
+        out = []
+        for raw in request.args.getlist(name):
+            out.extend(p.strip() for p in raw.split(",") if p.strip())
+        return out
+
     return {
-        "device": request.args.get("device", ""),
-        "ram": request.args.get("ram", ""),
-        "scenario": request.args.get("scenario", ""),
+        "device": _list("device"),
+        "ram": _list("ram"),
+        "scenario": _list("scenario"),
         "start_date": request.args.get("start_date", ""),
         "end_date": request.args.get("end_date", ""),
         "last_n": _int("last_n"),
