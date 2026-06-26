@@ -329,6 +329,7 @@ _HEADER_FIELDS = [
     ("OS Build", "os_build"),
     ("HW Version (EV/DV)", "HWVersion"),
     ("Battery Capacity", "battery_capacity_wh"),
+    ("Default RAM", "memory_size_gb"),
     ("Usable RAM", "usable_ram_config_gb"),
 ]
 
@@ -365,6 +366,8 @@ def _load_columns() -> list[dict]:
         scenario = run_info.get("scenario") or test_name or ""
 
         header = {label: device_config.get(key, "") for label, key in _HEADER_FIELDS}
+        # Host Name is per-run (varies across iterations), sourced from run_info.
+        header["Host Name"] = run_info.get("HostName") or run_info.get("hostname") or ""
 
         # Power Metrics (from power_calculation), plus the full calculation/metric
         # maps for the "all metrics" view.

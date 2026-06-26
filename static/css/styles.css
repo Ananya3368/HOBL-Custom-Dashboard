@@ -32,7 +32,7 @@
         header h1 { font-size: 20px; font-weight: 600; }
 
         .container {
-            max-width: 1200px;
+            max-width: 1800px;
             margin: 24px auto;
             padding: 0 24px;
         }
@@ -263,34 +263,44 @@
         }
 
         /* ── Transposed (Excel-style) table ─────────────────── */
-        .xtable-scroll { overflow-x: auto; max-width: 100%; }
+        .xtable-scroll {
+            overflow-x: auto;
+            max-width: 100%;
+            border: 1px solid #dbe2ea;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(15, 40, 80, 0.07);
+            background: var(--card-bg);
+        }
         table.xtable {
-            border-collapse: collapse;
+            border-collapse: separate;
+            border-spacing: 0;
             font-size: 13px;
             white-space: nowrap;
         }
         table.xtable td {
-            border: 1px solid var(--border);
-            padding: 5px 10px;
+            border-right: 1px solid #eef1f5;
+            border-bottom: 1px solid #eef1f5;
+            padding: 6px 12px;
             text-align: center;
         }
-        table.xtable td.num { text-align: right; font-variant-numeric: tabular-nums; }
-        table.xtable td.na { color: var(--text-secondary); font-style: italic; }
+        table.xtable td.num { text-align: center; font-variant-numeric: tabular-nums; }
+        table.xtable td.na { color: var(--text-secondary); font-style: italic; text-align: center; }
         table.xtable td.row-label {
             position: sticky;
             left: 0;
             z-index: 2;
-            background: #f5f7fa;
+            background: #f4f6fa;
             text-align: left;
             font-weight: 600;
             color: var(--text);
             min-width: 230px;
-            border-right: 2px solid var(--border);
+            border-right: 1px solid #d7dee8;
+            box-shadow: 3px 0 6px -3px rgba(15, 40, 80, 0.18);
         }
-        table.xtable tr:hover td { background: #f0f6ff; }
-        table.xtable tr:hover td.row-label { background: #e9eff7; }
-        table.xtable tr.hdr-row td { background: #fafbfc; }
-        table.xtable tr.hdr-row td.row-label { background: #eef1f5; }
+        table.xtable tr:hover td { background: #eaf3ff; }
+        table.xtable tr:hover td.row-label { background: #e2ecfa; }
+        table.xtable tr.hdr-row td { background: #fafbfd; color: var(--text-secondary); }
+        table.xtable tr.hdr-row td.row-label { background: #eef1f6; color: var(--text); }
         table.xtable tr.scenario-row td,
         table.xtable tr.date-row td,
         table.xtable tr.filepath-row td,
@@ -299,19 +309,74 @@
             font-weight: 600;
             color: var(--primary-dark);
         }
-        table.xtable tr.scenario-row td { background: #e3ebf6; }
-        table.xtable td.scenario-cell { text-align: center; background: #e3ebf6; }
+        table.xtable tr.scenario-row td {
+            background: linear-gradient(180deg, #e7eef8 0%, #dde7f4 100%);
+            font-size: 13.5px;
+            letter-spacing: 0.2px;
+        }
+        table.xtable td.scenario-cell { text-align: center; }
+        table.xtable tr.iter-row td { border-bottom: 2px solid #d3deee; }
+
+        /* Device-constant cells span a whole device; pin the value just right of
+           the sticky row-label column so it stays visible while scrolling. */
+        table.xtable td.const-cell { text-align: left; padding: 0; }
+        table.xtable td.const-cell .sticky-const {
+            position: sticky;
+            left: 232px;
+            display: inline-block;
+            padding: 7px 12px;
+            background: #fafbfc;
+            font-weight: 600;
+            color: var(--text);
+        }
+        table.xtable tr:hover td.const-cell .sticky-const { background: #eaf3ff; }
         table.xtable td.date-cell { text-align: center; background: #eef2f8; }
+        /* Strong divider between Device + config + Scenario groups. */
         table.xtable td.grp-start { border-left: 3px solid var(--primary); }
+        /* Per-group summary columns (P50/P70/P90/CoV): lighter, thinner accent so
+           they read as a sub-block, clearly distinct from the scenario divider. */
+        table.xtable td.stat-start { border-left: 2px solid #c4d8f0; }
+        table.xtable td.stat { text-align: center; background: #f2f7fd; font-variant-numeric: tabular-nums; }
+        table.xtable td.stat.na { color: #9aa3ad; font-style: italic; }
+        table.xtable td.stat.cov { color: #6a4fb0; font-weight: 600; }
+        table.xtable td.stat.stretch { color: #1d7a5f; font-weight: 600; }
+        table.xtable tr.iter-row td.stat.stat-hdr,
+        table.xtable td.stat.stat-hdr {
+            font-weight: 700;
+            background: #dde8f7;
+            color: var(--primary-dark);
+            letter-spacing: 0.3px;
+        }
+        table.xtable tr:hover td.stat { background: #e3eefb; }
+
+        /* Zebra striping over the data area (continuous across sections). */
+        table.xtable tr.metric-row.alt td.num,
+        table.xtable tr.metric-row.alt td.na { background: #f7f9fd; }
+        table.xtable tr.metric-row.alt td.stat { background: #eaf1fb; }
+        table.xtable tr.metric-row.alt td.row-label { background: #eef1f6; }
+        table.xtable tr.metric-row:hover td.num,
+        table.xtable tr.metric-row:hover td.na { background: #eaf3ff; }
+        table.xtable tr.metric-row:hover td.stat { background: #e3eefb; }
+        table.xtable tr.metric-row:hover td.row-label { background: #e2ecfa; }
+
         table.xtable tr.section-row td {
-            background: var(--primary);
+            background: linear-gradient(180deg, #1487e0 0%, var(--primary) 60%, var(--primary-dark) 100%);
             color: #fff;
             text-align: left;
             font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.4px;
+            letter-spacing: 0.6px;
+            font-size: 12.5px;
+            padding: 0;
+        }
+        /* A wide colspan cell can't itself stick (it fills its row), so pin the
+           title text in a sticky span so it stays visible while scrolling. */
+        table.xtable tr.section-row td .section-title {
             position: sticky;
             left: 0;
+            z-index: 3;
+            display: inline-block;
+            padding: 8px 12px;
         }
 
         .metric-type {
@@ -327,6 +392,55 @@
         .metric-type.PerfMetrics { background: #e3f2fd; color: #1565c0; }
 
         .value-cell { font-family: 'Consolas', 'Courier New', monospace; font-weight: 600; }
+
+        /* ── Power metric picker (Table Specified view) ──── */
+        .power-toolbar { position: relative; margin-bottom: 10px; }
+        .power-btn {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            cursor: pointer;
+        }
+        .power-btn:hover { background: #f0f6ff; border-color: var(--primary); }
+        .power-panel {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            z-index: 30;
+            margin-top: 4px;
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+            padding: 10px 14px;
+            max-height: 360px;
+            overflow-y: auto;
+            min-width: 280px;
+        }
+        .power-group-title {
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: var(--text-secondary);
+            margin: 8px 0 4px;
+        }
+        .power-group-title:first-child { margin-top: 0; }
+        .power-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            padding: 3px 2px;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+        .power-item:hover { background: #f0f6ff; }
+        .power-item input { cursor: pointer; }
 
         /* ── Charts (Box & Whisker view) ────────────────── */
         .chart-card {
@@ -436,6 +550,87 @@
             min-width: 260px;
         }
 
+        /* Three metric-type dropdowns (perf / power calc / power rails). */
+        .pct-controls-multi {
+            align-items: stretch;
+            gap: 14px;
+            flex-wrap: wrap;
+            background: #f7f9fc;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px 14px;
+        }
+        .pct-dd { display: flex; flex-direction: column; gap: 6px; min-width: 240px; flex: 1; }
+        .pct-dd-head {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+        .pct-dd-title {
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            color: var(--text-secondary);
+        }
+        .pct-dd.is-active .pct-dd-title { color: var(--primary-dark); }
+        /* Radio circle: hollow when inactive, filled-dot when active. */
+        .pct-radio {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            border: 2px solid #b6c0cc;
+            border-radius: 50%;
+            background: white;
+            cursor: pointer;
+            flex: 0 0 auto;
+            position: relative;
+            transition: border-color 0.12s ease;
+        }
+        .pct-radio:hover:not(:disabled) { border-color: var(--primary); }
+        .pct-radio:checked {
+            border-color: var(--primary);
+        }
+        .pct-radio:checked::after {
+            content: '';
+            position: absolute;
+            top: 50%; left: 50%;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--primary);
+            transform: translate(-50%, -50%);
+        }
+        .pct-radio:disabled { cursor: not-allowed; border-color: #dde2e8; }
+        .pct-msel { position: relative; }
+        .pct-mtoggle:disabled {
+            background: #eef0f3;
+            color: #9aa3ad;
+            cursor: not-allowed;
+            border-color: #e2e5ea;
+        }
+        .pct-dd-empty { font-weight: 500; text-transform: none; letter-spacing: 0; color: #aab2bd; }
+
+        .pct-sub {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+
+        /* Stacked per-metric chart blocks (when "All" is selected). */
+        .pct-block { margin-bottom: 18px; }
+        .pct-block + .pct-block { border-top: 1px dashed var(--border); padding-top: 14px; }
+        .pct-block-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--primary-dark);
+            margin-bottom: 6px;
+        }
+        .pct-chart { width: 100%; }
+
         #modalStats { margin-top: 8px; }
         #modalStats table {
             width: 100%;
@@ -456,5 +651,29 @@
             height: 10px;
             border-radius: 2px;
             margin-right: 6px;
+            vertical-align: middle;
+        }
+
+        #pctStats { margin-top: 18px; }
+        .pct-stats-table {
+            border-collapse: collapse;
+            font-size: 13px;
+            width: 100%;
+            max-width: 640px;
+        }
+        .pct-stats-table th, .pct-stats-table td {
+            border: 1px solid var(--border);
+            padding: 6px 12px;
+            text-align: right;
+            white-space: nowrap;
+        }
+        .pct-stats-table th { background: #f5f7fa; color: var(--text); font-weight: 600; }
+        .pct-stats-table td:first-child, .pct-stats-table th:first-child { text-align: left; }
+        .pct-swatch {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 2px;
+            margin-right: 8px;
             vertical-align: middle;
         }

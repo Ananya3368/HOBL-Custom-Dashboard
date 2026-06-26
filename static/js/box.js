@@ -18,6 +18,18 @@ function median(values) {
 }
 
 function renderBoxplots(metrics) {
+    // The Box & Whisker view describes ONE scenario at a time. If the fetched
+    // data spans several scenarios, prompt the user to narrow and re-Apply.
+    const scenarios = Array.from(new Set(metrics.map(m => m.Scenario)));
+    if (scenarios.length > 1) {
+        resultsDiv.innerHTML =
+            `<div class="results-summary">${activeFilterSummary()} &nbsp;|&nbsp; ${metrics.length} metric(s)</div>` +
+            `<div class="chart-note">The Box &amp; Whisker view shows one scenario at a time. ` +
+            `Please select a single <strong>Scenario</strong> and click <strong>Apply</strong> ` +
+            `(currently ${scenarios.length} scenarios match).</div>`;
+        return;
+    }
+
     buildDeviceColorMap(metrics);
     let html = `<div class="results-summary">${activeFilterSummary()} &nbsp;|&nbsp; ${metrics.length} metric(s)</div>`;
     BOX_TYPES.forEach(cfg => {
@@ -28,13 +40,24 @@ function renderBoxplots(metrics) {
             <div class="box-holder"><div id="${cfg.id}"></div></div>
         </div>`;
     });
-    html += `<div class="chart-note">Perf Metrics box plots are not shown yet (a metric can repeat with different values within one iteration). This is pending confirmation.</div>`;
+    // Curated performance metrics, derived in the same first / P50-P70-P90 manner
+    // as the Table (Specified) view.
+    const perfRows = (typeof curatedPerfMetricRows === 'function' && currentTable)
+        ? curatedPerfMetricRows(currentTable).filter(r => r.Scenario === scenarios[0])
+        : [];
+    html += `
+        <div class="chart-card">
+            <h3>Performance Metrics</h3>
+            <div class="chart-sub">Curated performance metrics, shown the same way as the Table (Specified) view${'\u0020'}(first value, or P50/P70/P90). Box = quartiles, line = median.</div>
+            <div class="box-holder"><div id="boxPerf"></div></div>
+        </div>`;
     resultsDiv.innerHTML = html;
 
     BOX_TYPES.forEach(cfg => {
         const rows = metrics.filter(m => m.MetricType === cfg.type);
         drawBoxChart(cfg.id, rows);
     });
+    drawBoxChart('boxPerf', perfRows);
 }
 
 function drawBoxChart(elementId, rows) {
@@ -144,9 +167,11 @@ function openMetricModal(label, typeRows) {
     modalTitle.textContent = label;
 
     const devices = Array.from(new Set(rows.map(r => r.Device)));
+    const unitLabel = rows[0].Unit ? ` ${rows[0].Unit}` : '';
 
-    // One tall, vertical box per device. Hover is disabled — all detail
-    // is shown in the stats table below the chart instead of on the graph.
+    // One tall, vertical box per device. Hover shows each point's coordinate
+    // (device + value); the chart is zoomable (scroll / drag / reset) so the
+    // user can inspect devices whose values sit far apart on the shared axis.
     const traces = devices.map((device, i) => {
         const dr = rows.filter(r => r.Device === device);
         const color = colorFor(device);
@@ -163,7 +188,8 @@ function openMetricModal(label, typeRows) {
             marker: { size: 6, color: color },
             line: { color: color },
             fillcolor: color + '33',
-            hoverinfo: 'skip',
+            hoveron: 'points',
+            hovertemplate: '%{x}<br>Value: %{y}' + unitLabel + '<extra></extra>',
         };
     });
 
@@ -171,6 +197,8 @@ function openMetricModal(label, typeRows) {
         height: 460,
         margin: { l: 70, r: 30, t: 16, b: 70 },
         boxgap: 0.4,
+        hovermode: 'closest',
+        dragmode: 'zoom',
         yaxis: { title: 'Value' + (rows[0].Unit ? ` (${rows[0].Unit})` : ''), zeroline: false, gridcolor: '#eee', automargin: true },
         xaxis: { automargin: true, tickfont: { size: 12 } },
         showlegend: false,
@@ -179,7 +207,15 @@ function openMetricModal(label, typeRows) {
         plot_bgcolor: 'white',
     };
 
-    Plotly.newPlot('modalChart', traces, layout, { responsive: true, displayModeBar: false });
+    // Enable interactive zoom: scroll-wheel zooms toward the cursor, drag boxes
+    // a region, and the modebar / double-click resets the view.
+    Plotly.newPlot('modalChart', traces, layout, {
+        responsive: true,
+        scrollZoom: true,
+        displayModeBar: true,
+        displaylogo: false,
+        modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+    });
 
     // Build the stats table (one row per device).
     const unit = rows[0].Unit ? ` (${rows[0].Unit})` : '';
@@ -199,7 +235,7 @@ function openMetricModal(label, typeRows) {
             <td>${fmt(st.upperWhisker)}</td><td>${fmt(st.max)}</td>
             <td>${fmt(st.mean)}</td><td>${fmt(st.std)}</td></tr>`;
     });
-    html += `</tbody></table><div class="chart-sub" style="margin-top:8px">All values in${unit || ' raw units'}.</div>`;
+    html += `</tbody></table><div class="chart-sub" style="margin-top:8px">All values in${unit || ' raw units'}. &nbsp;Hover a point to read its value; scroll to zoom toward the cursor, drag to box-zoom, double-click to reset.</div>`;
     document.getElementById('modalStats').innerHTML = html;
 
     metricModal.hidden = false;

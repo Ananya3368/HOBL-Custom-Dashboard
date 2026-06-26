@@ -27,6 +27,7 @@ function createMultiSelect(container, opts) {
     const allLabel = opts.allLabel || 'All';
     const formatLabel = opts.formatLabel || (v => String(v));
     let values = [];
+    let single = false;  // when true, only one option can be selected at a time
     const selected = new Set();
 
     const toggle = document.createElement('button');
@@ -61,6 +62,10 @@ function createMultiSelect(container, opts) {
     container.appendChild(toggle);
     container.appendChild(panel);
 
+    // Keep the panel open while interacting with it: stop clicks inside from
+    // reaching the document-level "close on outside click" handler.
+    panel.addEventListener('click', e => e.stopPropagation());
+
     function updateText() {
         if (selected.size === 0 || selected.size === values.length) {
             text.textContent = `${allLabel} (${values.length})`;
@@ -80,8 +85,15 @@ function createMultiSelect(container, opts) {
             cb.type = 'checkbox';
             cb.checked = selected.has(v);
             cb.addEventListener('change', () => {
-                if (cb.checked) selected.add(v); else selected.delete(v);
-                updateText();
+                if (single) {
+                    // Radio-like: checking one clears the others.
+                    selected.clear();
+                    if (cb.checked) selected.add(v);
+                    render();
+                } else {
+                    if (cb.checked) selected.add(v); else selected.delete(v);
+                    updateText();
+                }
             });
             const span = document.createElement('span');
             span.textContent = formatLabel(v);
@@ -117,6 +129,18 @@ function createMultiSelect(container, opts) {
         },
         getSelected() { return Array.from(selected); },
         clear() { selected.clear(); render(); },
+        // Toggle single-selection (radio-like) mode. When enabling, collapse any
+        // existing multi-selection down to its first value.
+        setSingle(flag) {
+            single = !!flag;
+            if (single && selected.size > 1) {
+                const first = Array.from(selected)[0];
+                selected.clear();
+                selected.add(first);
+            }
+            selAll.style.display = single ? 'none' : '';
+            render();
+        },
         _close() { panel.style.display = 'none'; },
     };
     _allMultiSelects.push(api);
@@ -136,9 +160,13 @@ let currentMetrics = null;
 let currentTable = null;   // per-iteration columns for the transposed table views
 let lastParams = '';
 
-// Remembers the metric chosen in the Percentile Distribution view so it
-// survives re-renders (e.g. switching metric without refetching).
-let pctMetricName = null;
+// Remembers the metric selection in the Percentile Distribution view so it
+// survives re-renders (e.g. switching metrics without refetching). pctMetricType
+// is which of the three metric-type dropdowns is active ('perf'|'calc'|'rail').
+// pctMetricSel maps each type to a Set of the metric names currently checked in
+// that dropdown's multi-select; the active type defaults to all of its metrics.
+let pctMetricType = null;
+let pctMetricSel = {};
 
 // Stable device→color map so a device keeps the same color in the main
 // box charts, the legend, and the zoomed-in modal.
@@ -289,7 +317,9 @@ function resetFilters() {
     endDate.value = endDate.max || '';
     lastN.value = '';
     syncExclusiveFilters();
-    pctMetricName = null;
+    updateScenarioMode();
+    pctMetricSel = {};
+    pctMetricType = null;
     currentMetrics = null;
     showStatus('Choose any filters (or none) and click <strong>Apply</strong> to view metrics.');
 }
@@ -326,12 +356,21 @@ function syncExclusiveFilters() {
     endDate.classList.toggle('disabled', useLastN);
 }
 
+// Some views (Box & Whisker, Percentile Distribution) describe a single
+// scenario at a time, so the scenario filter becomes single-select while they
+// are active. Multiple devices / RAM configs remain allowed (shown as separate
+// colored series).
+function updateScenarioMode() {
+    const v = viewSelect.value;
+    scenarioMS.setSingle(v === 'box' || v === 'percentile');
+}
+
 // Wire up event listeners once every viewer module has loaded and defined its
 // globals (closeMetricModal lives in box.js, render*() in the viewer files).
 document.addEventListener('DOMContentLoaded', () => {
     applyBtn.addEventListener('click', applyFilters);
     resetBtn.addEventListener('click', resetFilters);
-    viewSelect.addEventListener('change', renderCurrentView);
+    viewSelect.addEventListener('change', () => { updateScenarioMode(); renderCurrentView(); });
     lastN.addEventListener('input', syncExclusiveFilters);
     modalClose.addEventListener('click', closeMetricModal);
     metricModal.addEventListener('click', evt => { if (evt.target === metricModal) closeMetricModal(); });

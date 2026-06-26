@@ -213,7 +213,8 @@ def get_metrics(
 # perf samples (grouped by Pt, original order, NOT de-duplicated) so the UI can
 # compute "first value" and per-iteration P50/P70/P90. The DeviceConfig dynamic
 # column carries cpu_mfg (IHV) / device_name / dut_type / LKG / os_build /
-# HWVersion / battery_capacity_wh / usable_ram_config_gb; perf samples live in
+# HWVersion / battery_capacity_wh / memory_size_gb (Default RAM) /
+# usable_ram_config_gb; perf samples live in
 # the Pt/Value rows. Confirm the exact
 # perf-sample shape once real rows exist, then return the same structure as
 # json_data.get_table_data so the frontend stays source-agnostic.
