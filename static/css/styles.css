@@ -31,6 +31,90 @@
 
         header h1 { font-size: 20px; font-weight: 600; }
 
+        /* ── Data-source indicator (top-right of header) ── */
+        .ds-indicator {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.15);
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            border-radius: 20px;
+            color: white;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+        .ds-indicator:hover { background: rgba(255, 255, 255, 0.28); }
+        .ds-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: #9aa3ad;
+            flex: 0 0 auto;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
+        }
+        .ds-indicator.ds-kusto .ds-dot { background: #4caf50; }
+        .ds-indicator.ds-json .ds-dot { background: #ffb300; }
+        .ds-label { white-space: nowrap; }
+
+        /* ── Data-source modal ── */
+        .ds-modal-box { max-width: 520px; width: 92%; }
+        .ds-help { font-size: 13px; color: var(--text-secondary); margin-bottom: 14px; line-height: 1.45; }
+        .ds-radio {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 12px 14px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: border-color 0.15s ease, background 0.15s ease;
+        }
+        .ds-radio:hover { background: #f7f9fc; }
+        .ds-radio input { margin-top: 3px; cursor: pointer; }
+        .ds-radio-text { display: flex; flex-direction: column; gap: 2px; }
+        .ds-radio-text small { color: var(--text-secondary); font-size: 12px; }
+        .ds-radio input:disabled + .ds-radio-text { color: #aab2bd; }
+        .ds-json-panel { margin: 6px 0 12px; }
+        .ds-json-panel[hidden] { display: none; }
+        .ds-drop {
+            border: 2px dashed #c4d8f0;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            background: #f7fafe;
+            transition: border-color 0.15s ease, background 0.15s ease;
+        }
+        .ds-drop.is-dragover { border-color: var(--primary); background: #eaf3fc; }
+        .ds-drop-text { font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; }
+        .ds-choose { display: inline-block; }
+        .ds-count { font-size: 12px; color: var(--text-secondary); margin-top: 10px; }
+        .ds-clear {
+            margin-top: 8px;
+            background: none;
+            border: none;
+            color: var(--primary);
+            font-size: 12px;
+            cursor: pointer;
+            padding: 4px 0;
+        }
+        .ds-clear:hover { text-decoration: underline; }
+        .ds-msg {
+            font-size: 13px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+            background: #eef7ee;
+            color: #2e7d32;
+        }
+        .ds-msg[hidden] { display: none; }
+        .ds-msg.is-error { background: #fdecea; color: #c0392b; }
+        .ds-actions { display: flex; justify-content: flex-end; }
+
         .container {
             max-width: 1800px;
             margin: 24px auto;
@@ -314,13 +398,17 @@
             font-size: 13.5px;
             letter-spacing: 0.2px;
         }
-        table.xtable td.scenario-cell { text-align: center; }
         table.xtable tr.iter-row td { border-bottom: 2px solid #d3deee; }
 
-        /* Device-constant cells span a whole device; pin the value just right of
-           the sticky row-label column so it stays visible while scrolling. */
-        table.xtable td.const-cell { text-align: left; padding: 0; }
-        table.xtable td.const-cell .sticky-const {
+        /* Device-constant, Scenario and Date values span a block and are pinned just
+           right of the sticky row-label column, so the value stays left-aligned and
+           visible while scrolling until the next block's value scrolls in. */
+        table.xtable td.const-cell,
+        table.xtable td.scenario-cell,
+        table.xtable td.date-cell { text-align: left; padding: 0; }
+        table.xtable td.const-cell .sticky-const,
+        table.xtable td.scenario-cell .sticky-const,
+        table.xtable td.date-cell .sticky-const {
             position: sticky;
             left: 232px;
             display: inline-block;
@@ -329,8 +417,15 @@
             font-weight: 600;
             color: var(--text);
         }
-        table.xtable tr:hover td.const-cell .sticky-const { background: #eaf3ff; }
-        table.xtable td.date-cell { text-align: center; background: #eef2f8; }
+        table.xtable td.scenario-cell .sticky-const { background: transparent; color: var(--primary-dark); }
+        table.xtable td.date-cell { background: #eef2f8; }
+        table.xtable td.date-cell .sticky-const { background: #eef2f8; color: var(--primary-dark); }
+        table.xtable tr:hover td.const-cell .sticky-const,
+        table.xtable tr:hover td.scenario-cell .sticky-const,
+        table.xtable tr:hover td.date-cell .sticky-const { background: #eaf3ff; }
+        /* Light, thin divider between distinct dates within a scenario group —
+           lighter and thinner than the strong scenario group divider (grp-start). */
+        table.xtable td.date-cell.date-div { border-left: 1px solid #c4d8f0; }
         /* Strong divider between Device + config + Scenario groups. */
         table.xtable td.grp-start { border-left: 3px solid var(--primary); }
         /* Per-group summary columns (P50/P70/P90/CoV): lighter, thinner accent so
@@ -339,6 +434,9 @@
         table.xtable td.stat { text-align: center; background: #f2f7fd; font-variant-numeric: tabular-nums; }
         table.xtable td.stat.na { color: #9aa3ad; font-style: italic; }
         table.xtable td.stat.cov { color: #6a4fb0; font-weight: 600; }
+        /* When the CoV heatmap is applied, the cell carries an inline gradient
+           background, so use dark text for contrast over green/yellow/red. */
+        table.xtable td.stat.cov.cov-heat { color: #243b53; }
         table.xtable td.stat.stretch { color: #1d7a5f; font-weight: 600; }
         table.xtable tr.iter-row td.stat.stat-hdr,
         table.xtable td.stat.stat-hdr {

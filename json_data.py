@@ -25,6 +25,17 @@ from pathlib import Path
 
 import config
 
+
+def _json_dir() -> str:
+    """Active folder to read JSON files from in JSON mode.
+
+    This is exclusively the folder of files uploaded through the dashboard
+    (config.UPLOAD_DIR). When nothing has been uploaded (or after the user clears
+    the uploads) the folder is empty, so the dashboard shows no data until the
+    user uploads result files — it never reads from any other location.
+    """
+    return getattr(config, "UPLOAD_DIR", "") or ""
+
 # All provided JSON files were uploaded today.
 _TODAY = date.today().isoformat()
 
@@ -65,10 +76,10 @@ def _to_number(raw):
 
 
 def _load_records() -> list[dict]:
-    """Load every JSON file in config.JSON_DIR into a flat list of metric rows,
-    one row per metric, shaped like a Hobl_RawMetrics record."""
+    """Load every JSON file in the active JSON folder into a flat list of metric
+    rows, one row per metric, shaped like a Hobl_RawMetrics record."""
     records: list[dict] = []
-    folder = Path(config.JSON_DIR)
+    folder = Path(_json_dir())
     if not folder.is_dir():
         return records
 
@@ -346,7 +357,7 @@ _POWER_FIELDS = [
 def _load_columns() -> list[dict]:
     """Load each JSON file as one iteration "column" for the transposed table."""
     columns: list[dict] = []
-    folder = Path(config.JSON_DIR)
+    folder = Path(_json_dir())
     if not folder.is_dir():
         return columns
 

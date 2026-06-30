@@ -17,3 +17,7 @@ flask.log
 Thumbs.db
 .vscode/
 .idea/
+
+# Runtime data-source state + user-uploaded JSON files
+runtime_state.json
+uploaded_json/

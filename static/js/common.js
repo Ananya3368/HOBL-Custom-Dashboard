@@ -345,6 +345,133 @@ function activeFilterSummary() {
     return parts.join(' &nbsp;|&nbsp; ');
 }
 
+// ── Data-source control (top-right indicator + modal) ──────────
+const dsIndicator = document.getElementById('dsIndicator');
+const dsLabel = document.getElementById('dsLabel');
+const dsModal = document.getElementById('dsModal');
+const dsClose = document.getElementById('dsClose');
+const dsApply = document.getElementById('dsApply');
+const dsJsonPanel = document.getElementById('dsJsonPanel');
+const dsDrop = document.getElementById('dsDrop');
+const dsFileInput = document.getElementById('dsFileInput');
+const dsCount = document.getElementById('dsCount');
+const dsClearBtn = document.getElementById('dsClearBtn');
+const dsMsg = document.getElementById('dsMsg');
+
+let dsState = { source: 'json', kusto_available: false, json_count: 0 };
+
+function dsSourceLabel(src) {
+    return src === 'kusto' ? 'Fungates (Kusto)' : 'JSON files';
+}
+
+function updateDsIndicator() {
+    dsLabel.textContent = dsSourceLabel(dsState.source);
+    dsIndicator.classList.toggle('ds-kusto', dsState.source === 'kusto');
+    dsIndicator.classList.toggle('ds-json', dsState.source === 'json');
+}
+
+function selectedDsRadio() {
+    const r = document.querySelector('input[name=dsSource]:checked');
+    return r ? r.value : dsState.source;
+}
+
+function updateDsCount() {
+    const n = dsState.json_count || 0;
+    dsCount.textContent = n ? `${n} JSON file${n === 1 ? '' : 's'} uploaded.` : 'No files uploaded yet.';
+}
+
+function applyDsToModal() {
+    document.querySelectorAll('input[name=dsSource]').forEach(r => {
+        r.checked = r.value === dsState.source;
+        if (r.value === 'kusto') r.disabled = !dsState.kusto_available;
+    });
+    dsJsonPanel.hidden = (selectedDsRadio() !== 'json');
+    updateDsCount();
+}
+
+function showDsMsg(text, isErr) {
+    dsMsg.textContent = text || '';
+    dsMsg.classList.toggle('is-error', !!isErr);
+    dsMsg.hidden = !text;
+}
+
+async function loadDataSource() {
+    try {
+        const d = await fetchJson('/api/datasource');
+        if (!d.error) { dsState = d; updateDsIndicator(); }
+    } catch (e) { /* keep default badge */ }
+}
+
+function openDsModal() { showDsMsg(''); applyDsToModal(); dsModal.hidden = false; }
+function closeDsModal() { dsModal.hidden = true; }
+
+async function uploadDsFiles(fileList) {
+    const files = Array.from(fileList || []).filter(f => f.name.toLowerCase().endsWith('.json'));
+    if (!files.length) { showDsMsg('Please choose .json files.', true); return; }
+    const fd = new FormData();
+    files.forEach(f => fd.append('files', f));
+    showDsMsg('Uploading…');
+    try {
+        const res = await fetch('/api/datasource/upload', { method: 'POST', body: fd });
+        const d = await res.json();
+        dsState.json_count = d.total;
+        updateDsCount();
+        showDsMsg(`${d.saved} file(s) uploaded.${d.skipped ? ' ' + d.skipped + ' skipped (not .json).' : ''}`);
+    } catch (e) {
+        showDsMsg('Upload failed: ' + e.message, true);
+    }
+}
+
+async function clearDsFiles() {
+    try {
+        const res = await fetch('/api/datasource/clear', { method: 'POST' });
+        const d = await res.json();
+        dsState.json_count = d.total;
+        updateDsCount();
+        showDsMsg('Uploaded files cleared.');
+    } catch (e) { showDsMsg('Clear failed: ' + e.message, true); }
+}
+
+async function applyDataSource() {
+    const src = selectedDsRadio();
+    try {
+        const res = await fetch('/api/datasource', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source: src }),
+        });
+        const d = await res.json();
+        if (d.error) { showDsMsg(d.error, true); return; }
+        dsState = d;
+        updateDsIndicator();
+        closeDsModal();
+        // The underlying dataset changed: reload filter options and reset the view.
+        currentMetrics = null; currentTable = null; lastParams = '';
+        await loadFilters();
+        showStatus('Data source switched to <strong>' + escapeHtml(dsSourceLabel(d.source)) +
+            '</strong>. Choose filters and click <strong>Apply</strong> to view metrics.');
+    } catch (e) {
+        showDsMsg('Failed to switch: ' + e.message, true);
+    }
+}
+
+function initDataSource() {
+    if (!dsIndicator) return;
+    dsIndicator.addEventListener('click', openDsModal);
+    dsClose.addEventListener('click', closeDsModal);
+    dsModal.addEventListener('click', e => { if (e.target === dsModal) closeDsModal(); });
+    dsApply.addEventListener('click', applyDataSource);
+    document.querySelectorAll('input[name=dsSource]').forEach(r => {
+        r.addEventListener('change', () => { dsJsonPanel.hidden = (selectedDsRadio() !== 'json'); showDsMsg(''); });
+    });
+    dsFileInput.addEventListener('change', () => uploadDsFiles(dsFileInput.files));
+    dsClearBtn.addEventListener('click', clearDsFiles);
+    ['dragenter', 'dragover'].forEach(ev => dsDrop.addEventListener(ev, e => { e.preventDefault(); dsDrop.classList.add('is-dragover'); }));
+    ['dragleave', 'drop'].forEach(ev => dsDrop.addEventListener(ev, e => { e.preventDefault(); dsDrop.classList.remove('is-dragover'); }));
+    dsDrop.addEventListener('drop', e => uploadDsFiles(e.dataTransfer.files));
+    loadDataSource();
+}
+
 // ── Init ───────────────────────────────────────────────────────
 // Date range and Last-N are mutually exclusive. Entering a Last-N value
 // disables (greys out) the date pickers; clearing it re-enables them.
@@ -374,6 +501,11 @@ document.addEventListener('DOMContentLoaded', () => {
     lastN.addEventListener('input', syncExclusiveFilters);
     modalClose.addEventListener('click', closeMetricModal);
     metricModal.addEventListener('click', evt => { if (evt.target === metricModal) closeMetricModal(); });
-    document.addEventListener('keydown', evt => { if (evt.key === 'Escape' && !metricModal.hidden) closeMetricModal(); });
+    document.addEventListener('keydown', evt => {
+        if (evt.key !== 'Escape') return;
+        if (!metricModal.hidden) closeMetricModal();
+        else if (dsModal && !dsModal.hidden) closeDsModal();
+    });
+    initDataSource();
     loadFilters();
 });

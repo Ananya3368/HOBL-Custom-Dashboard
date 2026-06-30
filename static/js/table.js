@@ -179,6 +179,60 @@ function blankStatCells() {
     return `<td class="stat stat-start"></td><td class="stat"></td><td class="stat"></td><td class="stat"></td><td class="stat"></td>`;
 }
 
+// CoV heatmap colors: Excel's default 3-color scale — green (lowest variation),
+// yellow (median), red (highest variation).
+const _COV_GREEN = [0x63, 0xbe, 0x7b];
+const _COV_YELLOW = [0xff, 0xeb, 0x84];
+const _COV_RED = [0xf8, 0x69, 0x6b];
+
+function _covMix(a, b, t) {
+    const u = Math.max(0, Math.min(1, t));
+    return `rgb(${Math.round(a[0] + (b[0] - a[0]) * u)}, ${Math.round(a[1] + (b[1] - a[1]) * u)}, ${Math.round(a[2] + (b[2] - a[2]) * u)})`;
+}
+
+// Map a CoV value to a color: min -> dark green, median -> yellow, max -> dark red.
+// The yellow anchor sits at the median when it is strictly interior; otherwise it
+// falls back to the value midpoint so the lowest stays green and the highest red.
+function _covColor(v, min, med, max) {
+    if (!(max > min)) return 'rgb(255, 235, 132)';
+    let mid = med;
+    if (!(mid > min && mid < max)) mid = (min + max) / 2;
+    if (v <= mid) return _covMix(_COV_GREEN, _COV_YELLOW, (v - min) / (mid - min));
+    return _covMix(_COV_YELLOW, _COV_RED, (v - mid) / (max - mid));
+}
+
+// Color each CoV column (one per summary group) as a green->yellow->red scale,
+// normalized independently per column (like an Excel color scale on one column).
+// The bucket key is the group index, derived by counting `.stat-start` cells
+// (the P50 cell that opens each group, present in both numeric and N/A rows) —
+// NOT the position among `td.cov` cells. N/A summary cells carry no `cov` class,
+// so a positional index would shift whenever a group is N/A for that row,
+// collapsing CoV cells from different scenario columns into the same bucket.
+function applyCovHeatmap(root) {
+    const cols = new Map();   // groupIdx -> [{ cell, v }]
+    root.querySelectorAll('table.xtable tr.metric-row').forEach(row => {
+        let g = -1;
+        row.querySelectorAll('td.stat').forEach(cell => {
+            if (cell.classList.contains('stat-start')) g++;
+            if (!cell.classList.contains('cov')) return;
+            const v = parseFloat(cell.textContent);
+            if (!Number.isFinite(v)) return;
+            if (!cols.has(g)) cols.set(g, []);
+            cols.get(g).push({ cell, v });
+        });
+    });
+    cols.forEach(bucket => {
+        if (!bucket.length) return;
+        const sorted = bucket.map(b => b.v).sort((a, b) => a - b);
+        const min = sorted[0], max = sorted[sorted.length - 1];
+        const med = valueAtPercentile(sorted, 50);
+        bucket.forEach(({ cell, v }) => {
+            cell.style.backgroundColor = _covColor(v, min, med, max);
+            cell.classList.add('cov-heat');
+        });
+    });
+}
+
 // Generic metric data row: per-iteration cells (grouped) followed by the 4
 // summary cells for each group. `cellFn(col)` -> { v, num } for one iteration
 // cell; `sampleFn(col)` -> number[]|null contributing to that group's summary.
@@ -276,11 +330,14 @@ function renderTableTransposed(cols, curated) {
         body += `<tr class="hdr-row">${h}</tr>`;
     });
 
-    // Scenario row (merged per group, spanning its iterations + summary cols).
+    // Scenario row (merged per group; value pinned sticky like the const rows so it
+    // stays left-aligned and visible until the next group scrolls in).
     body += `<tr class="scenario-row">` + `<td class="row-label">Scenario</td>` +
-        scenarioGroups.map((g, gi) => `<td class="scenario-cell${gi > 0 ? ' grp-start' : ''}" colspan="${g.cols.length + 5}">${escapeHtml(g.scenario)}</td>`).join('') + `</tr>`;
+        scenarioGroups.map((g, gi) => `<td class="scenario-cell${gi > 0 ? ' grp-start' : ''}" colspan="${g.cols.length + 5}"><span class="sticky-const">${escapeHtml(g.scenario)}</span></td>`).join('') + `</tr>`;
 
-    // Date row (merged per date within a group; blank summary cell per group).
+    // Date row (merged per date within a group; value pinned sticky like the const
+    // rows. Distinct dates within a group get a light/thin divider; blank summary
+    // cell per group).
     {
         let h = `<td class="row-label">Date</td>`;
         scenarioGroups.forEach((g, gi) => {
@@ -291,8 +348,10 @@ function renderTableTransposed(cols, curated) {
                 d.n++;
             });
             subs.forEach((d, di) => {
-                const cls = 'date-cell' + (gi > 0 && di === 0 ? ' grp-start' : '');
-                h += `<td class="${cls}" colspan="${d.n}">${escapeHtml(d.date)}</td>`;
+                let cls = 'date-cell';
+                if (gi > 0 && di === 0) cls += ' grp-start';
+                else if (di > 0) cls += ' date-div';
+                h += `<td class="${cls}" colspan="${d.n}"><span class="sticky-const">${escapeHtml(d.date)}</span></td>`;
             });
             h += `<td class="stat grp-start" colspan="5"></td>`;
         });
@@ -374,6 +433,10 @@ function renderTableTransposed(cols, curated) {
         const w = Math.round(labelCellEl.getBoundingClientRect().width);
         resultsDiv.querySelectorAll('.sticky-const').forEach(s => { s.style.left = w + 'px'; });
     }
+
+    // Color the CoV column as an Excel-style green->yellow->red 3-color scale
+    // (low variation = green, median = yellow, high variation = red).
+    applyCovHeatmap(resultsDiv);
 }
 
 // Curated perf rows: first-value or P50/P70/P90 (collapsed if all equal).

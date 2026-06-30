@@ -1,23 +1,77 @@
 """HOBL Dashboard – Flask app that serves an interactive metrics dashboard.
 
-The data layer is pluggable: ``config.DATA_SOURCE`` selects between a temporary
-local-JSON backend (``json_data``) and the final Kusto backend (``kusto_data``).
-Both expose the same ``get_tiers`` / ``get_scenarios`` / ``get_dates`` /
-``get_metrics`` surface and the same record shape, so the routes and the
-frontend are identical regardless of source. Switching back to Kusto after the
-branch merges is a one-line change in ``config.py``.
+The data layer is pluggable: the active backend selects between a local-JSON
+backend (``json_data``) and the Kusto backend (``kusto_data``). Both expose the
+same ``get_filter_options`` / ``get_metrics`` / ``get_table_data`` surface and
+record shape, so the routes and the frontend are identical regardless of source.
+
+The active source can be switched at runtime from the dashboard UI (top-right
+data-source control). In JSON mode the user uploads JSON files through the
+browser; they are stored in ``config.UPLOAD_DIR`` and read by ``json_data``. The
+chosen source is persisted to ``config.RUNTIME_STATE_FILE`` so it survives
+restarts.
 """
 
+import json as _json
+import os
+
 from flask import Flask, render_template, jsonify, request
+from werkzeug.utils import secure_filename
 
 import config
+import json_data
 
-if config.DATA_SOURCE == "kusto":
-    import kusto_data as backend
-else:
-    import json_data as backend
+# Kusto is optional: importing it may fail if the SDK isn't installed yet. The
+# dashboard still works (in JSON mode) when it's unavailable.
+try:
+    import kusto_data
+except Exception:  # pragma: no cover - environment dependent
+    kusto_data = None
 
 app = Flask(__name__)
+
+
+# ── Runtime data-source state ────────────────────────────────────────────────
+
+def _load_state() -> dict:
+    """Load the persisted active source, falling back to the config default."""
+    try:
+        with open(config.RUNTIME_STATE_FILE, encoding="utf-8") as handle:
+            data = _json.load(handle)
+        if data.get("source") in ("json", "kusto"):
+            return {"source": data["source"]}
+    except (OSError, ValueError):
+        pass
+    return {"source": config.DATA_SOURCE}
+
+
+_state = _load_state()
+
+
+def _save_state() -> None:
+    try:
+        with open(config.RUNTIME_STATE_FILE, "w", encoding="utf-8") as handle:
+            _json.dump(_state, handle)
+    except OSError:
+        pass
+
+
+def _kusto_available() -> bool:
+    return kusto_data is not None
+
+
+def get_backend():
+    """Return the module backing the currently-selected data source."""
+    if _state["source"] == "kusto" and _kusto_available():
+        return kusto_data
+    return json_data
+
+
+def _uploaded_json_count() -> int:
+    try:
+        return sum(1 for n in os.listdir(config.UPLOAD_DIR) if n.lower().endswith(".json"))
+    except OSError:
+        return 0
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
@@ -27,11 +81,67 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/api/datasource", methods=["GET", "POST"])
+def api_datasource():
+    """Get or set the active data source.
+
+    POST body: {"source": "json" | "kusto"}. A request to switch to Kusto when
+    it isn't available is rejected.
+    """
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        src = data.get("source")
+        if src not in ("json", "kusto"):
+            return jsonify({"error": "source must be 'json' or 'kusto'"}), 400
+        if src == "kusto" and not _kusto_available():
+            return jsonify({"error": "Kusto backend is not available."}), 400
+        _state["source"] = src
+        _save_state()
+    return jsonify({
+        "source": _state["source"],
+        "kusto_available": _kusto_available(),
+        "json_count": _uploaded_json_count(),
+    })
+
+
+@app.route("/api/datasource/upload", methods=["POST"])
+def api_datasource_upload():
+    """Accept one or more uploaded JSON files for JSON mode."""
+    os.makedirs(config.UPLOAD_DIR, exist_ok=True)
+    saved, skipped = 0, 0
+    for f in request.files.getlist("files"):
+        name = f.filename or ""
+        if not name.lower().endswith(".json"):
+            skipped += 1
+            continue
+        safe = secure_filename(name) or f"upload_{saved}.json"
+        if not safe.lower().endswith(".json"):
+            safe += ".json"
+        try:
+            f.save(os.path.join(config.UPLOAD_DIR, safe))
+            saved += 1
+        except OSError:
+            skipped += 1
+    return jsonify({"saved": saved, "skipped": skipped, "total": _uploaded_json_count()})
+
+
+@app.route("/api/datasource/clear", methods=["POST"])
+def api_datasource_clear():
+    """Remove all uploaded JSON files."""
+    try:
+        for n in os.listdir(config.UPLOAD_DIR):
+            if n.lower().endswith(".json"):
+                os.remove(os.path.join(config.UPLOAD_DIR, n))
+    except OSError:
+        pass
+    return jsonify({"total": _uploaded_json_count()})
+
+
 @app.route("/api/filters")
 def api_filters():
     """Return distinct values for each independent, optional filter."""
     try:
-        return jsonify(backend.get_filter_options())
+        return jsonify(get_backend().get_filter_options())
     except Exception as exc:  # surfaced to the UI as a friendly error
         return jsonify({"error": str(exc)}), 500
 
@@ -70,7 +180,7 @@ def api_metrics():
     f = _parse_filters()
     try:
         return jsonify(
-            backend.get_metrics(
+            get_backend().get_metrics(
                 f["device"], f["ram"], f["scenario"], f["start_date"],
                 f["end_date"], f["last_n"], f["start_iter"], f["end_iter"],
             )
@@ -85,7 +195,7 @@ def api_table():
     f = _parse_filters()
     try:
         return jsonify(
-            backend.get_table_data(
+            get_backend().get_table_data(
                 f["device"], f["ram"], f["scenario"], f["start_date"],
                 f["end_date"], f["last_n"], f["start_iter"], f["end_iter"],
             )
@@ -98,7 +208,7 @@ def api_table():
 
 if __name__ == "__main__":
     print(f"Starting HOBL Dashboard on http://{config.HOST}:{config.PORT}")
-    print(f"Data source: {config.DATA_SOURCE}")
-    if config.DATA_SOURCE == "kusto":
+    print(f"Active data source: {_state['source']}")
+    if _state["source"] == "kusto":
         print("A browser window will open for Azure AD sign-in...")
     app.run(host=config.HOST, port=config.PORT, debug=config.DEBUG)
